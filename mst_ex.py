@@ -1,94 +1,87 @@
 import numpy as np
-from numpy import random
 import pandas as pd
 from sklearn.neighbors import DistanceMetric
-import seaborn as sns
-import matplotlib.pyplot as plt
-import time
-from sklearn.datasets import make_blobs
+from scipy.spatial import distance
 
 
-class_data = pd.read_csv('/Users/ividalquadras/Desktop/synthetic_clean.csv')
 
-df_pd = pd.DataFrame(class_data)
-df_pd.columns = ['x1', 'x2']
+def mst(data_path, k):
 
-def sort(df_pd):
-    l = len(df_pd)
-    df_pd['cluster'] = ['Non visited' for i in range(0,l)]
+    df_pd = pd.read_csv(data_path)  # import the data
+    N = len(df_pd)  # length of the data
+    df_pd.columns = [i for i in range(0, len(df_pd.columns))]  # name the columns with numbers
 
     # Compute distances
     dist = DistanceMetric.get_metric('euclidean')
-    df = df_pd[['x1', 'x2']].to_numpy()
+    df = df_pd.to_numpy()
 
-    distance = dist.pairwise(df)  # matrix with distances
+    distance = dist.pairwise(df)  # matrix with the pair-wise euclidean distance between all data points
 
-
-    # Get the edges in ascending order
+    # Sort the edges in ascending order (according to the distance in between vertices)
     sorted_edges = np.transpose(np.unravel_index(np.argsort(distance, axis=None), distance.shape)).tolist()
-    sorted_edges = sorted_edges[l::2] # Remove the first 0 and as they are duplicated, choose one for each 2
 
-    # Sorted distances
-    sorted_dist = np.sort(distance, axis=None).tolist()
-    sorted_dist = sorted_dist[l::2]
+    # Remove the first N zeros (distance between the same data points) and as they are duplicated, choose one for each 2
+    sorted_edges = sorted_edges[N::2]
 
-    return (sorted_edges, sorted_dist, df_pd)
+    # Add a cluster column to keep track of the point's cluster, if it does not belong to any, it will be 'Non visited'
+    df_pd['cluster'] = ['Non visited' for i in range(0, N)]
 
-# Define the algorithm
+    # Start algorithm
 
-def get_mst(k, N, sorted_edges, sorted_dist):
-
-    sorted_edges = sort(df_pd)[0]
-
-
+    # Initiate a dictionary with cluster and the data points it has
     cluster_dic = {-1: []}
+
+    # Initiate a counter for the number of edges we add
     counter = 0
 
-    for edge in sorted_edges:
+    for edge in sorted_edges:  # iterate over all the edges (sorted)
 
-        parent_0 = df_pd.iloc[edge[0], 2]
-        parent_1 = df_pd.iloc[edge[1], 2]
+        parent_0 = df_pd.loc[edge[0], 'cluster']  # set the cluster to which the first data point of the edge belongs to
+        parent_1 = df_pd.loc[
+            edge[1], 'cluster']  # set the cluster to which the second data point of the edge belongs to
 
+        # If both data points belong to the same cluster, then do nothing because it would create a cycle
         if (parent_0 == parent_1) and (parent_0 != 'Non visited'):
             pass
 
+        # If both data points have no cluster assigned, create a new cluster with both data points
         elif (parent_0 == 'Non visited') and (parent_1 == 'Non visited'):
             counter += 1
             max_cluster = max(cluster_dic)
             cluster_dic[max_cluster + 1] = [edge[0]]
             cluster_dic[max_cluster + 1] += [edge[1]]
 
-            df_pd.iloc[edge[0], 2] = max_cluster + 1
-            df_pd.iloc[edge[1], 2] = max_cluster + 1
+            # Keep track that these two data points have now a cluster by including the cluster number to df_pd
+            df_pd.loc[edge[0], 'cluster'] = max_cluster + 1
+            df_pd.loc[edge[1], 'cluster'] = max_cluster + 1
 
-
+        # If some of the data points does not belong to any cluster, add the other data point of the edge to the cluster
+        # of the first one and keep track that this data point has now a cluster by including the cluster to df_pd
         elif (parent_0 == 'Non visited') or (parent_1 == 'Non visited'):
             counter += 1
             if parent_0 == 'Non visited':
                 cluster_dic[parent_1] += [edge[0]]
-                df_pd.iloc[edge[0], 2] = parent_1
+                df_pd.loc[edge[0], 'cluster'] = parent_1
             else:
                 cluster_dic[parent_0] += [edge[1]]
-                df_pd.iloc[edge[1], 2] = parent_0
+                df_pd.loc[edge[1], 'cluster'] = parent_0
 
+        # If the two data points belong to different cluster, add the vertices of the second cluster to the first,
+        # delete the second cluster and change the cluster in df_pd for points in second cluster
         else:
             counter += 1
             cluster_dic[parent_0] += cluster_dic[parent_1]
             del cluster_dic[parent_1]
 
-            df_pd.iloc[df_pd['cluster'] == parent_1, 2] = parent_0
+            df_pd.loc[df_pd['cluster'] == parent_1, 'cluster'] = parent_0
 
+        # Stop iterating once we have N clusters, that is, we have added K == N - edges we have added and add these
+        # points as 'alone' clusters (clusters with only one data point)
         if N - counter == k:
-            for i in range(0, len(df_pd)):
-                if df_pd.iloc[i, 2] == 'Non visited':
-                    df_pd.iloc[i, 2] = i
+            for i in range(0, N):
+                if df_pd.loc[i, 'cluster'] == 'Non visited':
+                    df_pd.loc[i, 'cluster'] = i
 
             return df_pd
 
 
-cl = get_mst(3, 450, sorted_edges, sorted_dist)
-
-
-# Plot results
-sns.lmplot(x="x1", y="x2", data=cl, fit_reg=False, hue='cluster', legend = True)
-plt.show()
