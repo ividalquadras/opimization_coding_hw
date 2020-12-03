@@ -4,33 +4,43 @@ import pandas as pd
 from sklearn.neighbors import DistanceMetric
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-# Simulate dataframe
-x1 = np.random.uniform(low=0, high=2500, size=(200))
-x2 = np.random.uniform(low=5, high=3000, size=(200))
-
-df_pd = pd.DataFrame({'x1': x1, 'x2': x2}, columns=['x1', 'x2'])
-df_pd['cluster'] = ['Non visited' for i in range(0,200)]
-
-# Compute distances
-dist = DistanceMetric.get_metric('euclidean')  # euclidean distance
-df = df_pd[['x1', 'x2']].to_numpy()
-
-distance = dist.pairwise(df)  # matrix with distances
-
-# Get the edges in ascending order
-sorted_edges = np.transpose(np.unravel_index(np.argsort(distance, axis=None), distance.shape)).tolist()
-sorted_edges= sorted_edges[200::2] # Remove the first< 200 as they are 0 and as they are duplicated, choose one for each 2
-
-# Sorted distances
-sorted_dist = np.sort(distance, axis=None).tolist()
-sorted_dist = sorted_dist[200::2]
+import time
+from sklearn.datasets import make_blobs
 
 
+class_data = pd.read_csv('/Users/ividalquadras/Desktop/synthetic_clean.csv')
+
+df_pd = pd.DataFrame(class_data)
+df_pd.columns = ['x1', 'x2']
+
+def sort(df_pd):
+    l = len(df_pd)
+    df_pd['cluster'] = ['Non visited' for i in range(0,l)]
+
+    # Compute distances
+    dist = DistanceMetric.get_metric('euclidean')
+    df = df_pd[['x1', 'x2']].to_numpy()
+
+    distance = dist.pairwise(df)  # matrix with distances
+
+
+    # Get the edges in ascending order
+    sorted_edges = np.transpose(np.unravel_index(np.argsort(distance, axis=None), distance.shape)).tolist()
+    sorted_edges = sorted_edges[l::2] # Remove the first 0 and as they are duplicated, choose one for each 2
+
+    # Sorted distances
+    sorted_dist = np.sort(distance, axis=None).tolist()
+    sorted_dist = sorted_dist[l::2]
+
+    return (sorted_edges, sorted_dist, df_pd)
 
 # Define the algorithm
 
 def get_mst(k, N, sorted_edges, sorted_dist):
+
+    sorted_edges = sort(df_pd)[0]
+
+
     cluster_dic = {-1: []}
     counter = 0
 
@@ -76,7 +86,9 @@ def get_mst(k, N, sorted_edges, sorted_dist):
             return df_pd
 
 
-cl = get_mst(10, 200, sorted_edges, sorted_dist)
+cl = get_mst(3, 450, sorted_edges, sorted_dist)
+
 
 # Plot results
-sns.lmplot( x="x1", y="x2", data=cl, fit_reg=False, hue='cluster', legend = True)
+sns.lmplot(x="x1", y="x2", data=cl, fit_reg=False, hue='cluster', legend = True)
+plt.show()

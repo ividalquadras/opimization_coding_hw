@@ -4,71 +4,79 @@ import seaborn as sns
 from sklearn.neighbors import DistanceMetric
 import random
 import matplotlib.pyplot as plt
+from sklearn.datasets import make_blobs
 
 # Simulate dataframe
-x1 = np.random.uniform(low=0, high=2500, size=(200))
-x2 = np.random.uniform(low=5, high=3000, size=(200))
+#x1 = np.random.uniform(low=0, high=2500, size=(200))
+#x2 = np.random.uniform(low=5, high=3000, size=(200))
 
-df_pd = pd.DataFrame({'x1': x1, 'x2': x2}, columns=['x1', 'x2'])
-
-# Compute distances
-dist = DistanceMetric.get_metric('euclidean')  # euclidean distance
-df = df_pd[['x1', 'x2']].to_numpy()
-
-distance = dist.pairwise(df)  # matrix with distances
-
-# Get the edges in ascending order
-sorted_edges = np.transpose(np.unravel_index(np.argsort(distance, axis=None), distance.shape)).tolist()
-sorted_edges= sorted_edges[200::2] # Remove the first< 200 as they are 0 and as they are duplicated, choose one for each 2
-
-# Sorted distances
-sorted_dist = np.sort(distance, axis=None).tolist()
-sorted_dist = sorted_dist[200::2]
-
-df_pd['edge'] = df_pd[['x1', 'x2']].apply(tuple, axis=1)
-df_pd['cluster'] = ['Non visited' for i in range(0,200)]
+#df_pd = pd.DataFrame({'x1': x1, 'x2': x2}, columns=['x1', 'x2'])
 
 
-def centeroid(array):
-    length = len(array)
-    sum_x = sum(i for i, j in array)
-    sum_y = sum(j for i, j in array)
-    return sum_x/length, sum_y/length
+def closest(x, clusters):
+    c0 = []
+    d0 = np.Inf
+
+    for c in clusters:
+        d = np.linalg.norm(c-x)
+        if d < d0:
+            c0 = c
+            d0 = d
+    return c0
+
+def equal_clusters(c1, c2):
+    for c in range(len(c1)):
+        if np.linalg.norm(c1[c] - c2[c]) > 0.000000001:
+            return False
+
+    return True
 
 
-# Algorithm
+def k_means(df_pd, k):
 
-def k_means(num, df_pd):
-    final_clusters = df_pd.iloc[random.choices(df_pd.index.values, k=num), 2].values.tolist()
-    clus_original = df_pd['cluster'].tolist()
-    clus_final = [0] * len(clus_original)
+    clusters = df_pd.sample(k)['point'].to_list()
 
-    while clus_original != clus_final:
+    df_pd['cluster'] = df_pd.apply(lambda x: closest(x.point, clusters), axis=1)
 
-        initial_clusters = final_clusters
-        clus_original = df_pd['cluster'].tolist()
+    initial_clustering = np.array(df_pd['point'])
+    final_clustering = np.array(df_pd['cluster'])
 
-        for edge in range(0, len(df_pd)):
-            distances_to_cluster = {'cluster': initial_clusters, 'distance': []}
 
-            for i in initial_clusters:
-                dist = np.linalg.norm(np.array(df_pd.iloc[edge, 2]) - np.array(i))
-                distances_to_cluster['distance'] += [dist]
+    while not equal_clusters(final_clustering, initial_clustering):
+        initial_clustering = final_clustering
+        # Calcutate Centroids
+        df_pd['tuple'] = df_pd['cluster'].map(tuple)
 
-            dist_edge = pd.DataFrame(distances_to_cluster)
-            new_clus = (dist_edge.loc[(dist_edge['distance'] == dist_edge['distance'].min()), 'cluster']).values
+        def f(x):
+            return x.mean()
 
-            df_pd.iloc[edge, 3] = new_clus
+        clusters = [np.round(v, 3) for v in df_pd.groupby('tuple')['point'].apply(lambda x: x.mean()).values]
 
-        final_clusters = []
-        for i in df_pd.cluster.unique():
-            final_clusters += [centeroid(df_pd[df_pd['cluster'] == i]['cluster'].tolist())]
+        print(df_pd.groupby('tuple')['point'].count())
 
-        clus_final = df_pd['cluster'].tolist()
+        # Assing points to Centroids
+        df_pd['cluster'] = df_pd.apply(lambda x: closest(x.point, clusters), axis=1)
+
+        final_clustering = np.array(df_pd['cluster'])
 
     return df_pd
 
-cl = k_means(3, df_pd)
 
-sns.lmplot( x="x1", y="x2", data=cl, fit_reg=False, hue='cluster', legend = True)
-plt.show()
+if __name__ == '__main__':
+    k_num = 15
+    #seed = 8
+#    class_data = make_blobs(n_samples=[100, 200, 150], n_features=2, random_state=seed)
+#    df_aux = pd.DataFrame()
+#    df_aux = pd.DataFrame(class_data[0])
+
+    df_aux = pd.read_csv('/Users/ividalquadras/Desktop/synthetic_clean.csv')
+
+    df_pd = pd.DataFrame()
+    df_pd['point'] = df_aux.apply(np.array, axis=1)
+
+    cl = k_means(df_pd, k_num)
+
+    pl = pd.DataFrame({'x1': [v[0] for v in cl['point']], 'x2': [v[1] for v in cl['point']],
+                  'cluster': [str(i) for i in cl['tuple']]})
+    sns.lmplot( x="x1", y="x2", data=pl, fit_reg=False, hue='cluster', legend=False)
+    plt.show()
