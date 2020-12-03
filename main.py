@@ -15,7 +15,7 @@ import time
 # The plot will appear if the data is 2-dimensional
 # For taking a look at the function refer to the mst_ex.py file
 
-cl = mst('/Users/ividalquadras/Desktop/synthetic_clean.csv', 15)
+cl = mst('path', desired_clusters)
 
 # Data points with its assigned cluster
 print('Data points with its assigned cluster')
@@ -41,7 +41,7 @@ if len(cl.columns) == 3:
 # The plot will appear if the data is 2-dimensional
 # For taking a look at the function refer to the k_means_ex.py file
 
-cl_k = k_means('/Users/ividalquadras/Desktop/synthetic_clean.csv', 15)
+cl_k = k_means('path', desired_clusters)
 
 # Data points with its assigned cluster
 print("Data points with its assigned cluster's centroids")
